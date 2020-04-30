@@ -36,10 +36,14 @@ public class MarchingCubes : MonoBehaviour
                 for (int y = 0; y < height + 1; y++)
                 {
 
-                    float thisHeight = (float)height * Mathf.PerlinNoise((float)x / 16f * 1.5f + 0.001f, (float)z / 16f * 1.5f + 0.001f);
+                    //Debug.Log("X. " + x);
+                    //Debug.Log("Y. " + y);
+                    //Debug.Log("Z. " + z);
+                    float thisHeight = Perlin3D(x, y, z);
+                    //Debug.Log(thisHeight);
                     float point = 0;
 
-                    if (y <= thisHeight - 0.5f)
+                    if (y >= thisHeight - 0.5f)
                     {
                         point = 0;
                     }
@@ -152,6 +156,21 @@ public class MarchingCubes : MonoBehaviour
         mesh.RecalculateNormals();
         meshFilter.mesh = mesh;
     }
+
+    private static float Perlin3D(float x, float y, float z)
+    {
+        float ab = Mathf.PerlinNoise(x, y);
+        float bc = Mathf.PerlinNoise(y, z);
+        float ac = Mathf.PerlinNoise(x, z);
+
+        float ba = Mathf.PerlinNoise(y, x);
+        float cb = Mathf.PerlinNoise(z, y);
+        float ca = Mathf.PerlinNoise(z, x);
+
+        float abc = ab + bc + ac + ba + cb + ca;
+        return abc / 6f;
+    }
+
     Vector3Int[] CornerTable = new Vector3Int[8] {
 
         new Vector3Int(0, 0, 0),
