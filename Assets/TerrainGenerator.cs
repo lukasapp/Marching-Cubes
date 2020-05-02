@@ -1,20 +1,25 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using Random = UnityEngine.Random;
 
 [RequireComponent(typeof(MeshFilter))]
 public class TerrainGenerator : MonoBehaviour
 {
     public int size = 50;
     
-    public int offsetX = 0;
-    public int offsetY = 0;
-    public int offsetZ = 0;
+    public float offsetX = 0;
+    public float offsetY = 0;
+    public float offsetZ = 0;
 
-    [Range(0, 1)]
-    public float noiseScale = 0.05f;
-    [Range(0, 1)]
-    public float surfaceLevel = 0.55f;
+    [Range(1f, 50f)] public float noiseScale = 9;
+
+    [Range(1, 4)] public int noiseOctaves = 2;
+    [Range(0.001f, 1f)] public float noisePersistence = 0.43f;
+    [Range(-5f, 5f)] public float noiseLacunarity = 2.98f;
+
+    [Range(0f, 1f)] public float surfaceLevel = 0.564f;
 
     public int seed = 0;
 
@@ -22,7 +27,6 @@ public class TerrainGenerator : MonoBehaviour
     public bool debugMode = false;
 
     public bool autoUpdate = true;
-    private int rngOffset;
 
     private int[,,] points;
     private List<Vector3> vertices;
@@ -37,9 +41,6 @@ public class TerrainGenerator : MonoBehaviour
 
     public void Generate()
     {
-        Random.InitState(seed);
-        rngOffset = Random.Range(-1000000, 1000000);
-
         if (meshFilter.mesh != null)
         {
             meshFilter.mesh.Clear();
@@ -104,10 +105,29 @@ public class TerrainGenerator : MonoBehaviour
         }
     }
 
+    private float[,,] gizmos;
+    private void OnDrawGizmos()
+    {
+        if (gizmos is null)
+            return;
+
+        for (int x = 0; x < size; x++)
+            for (int y = 0; y < size; y++)
+                for (int z = 0; z < size; z++)
+                {
+                    float gizmo = gizmos[x,y,z];
+                    if(gizmo <= 0)
+                        continue;
+                    Gizmos.color = new Color(1f-gizmo, 1f-gizmo, 1f-gizmo, 0.4f);
+                    Gizmos.DrawCube(new Vector3(x,y,z), Vector3.one);
+                }
+    }
+
     private void GenerateTerrainMap()
     {
         float max = 0.5f;
         float min = 0.5f;
+        //gizmos = new float[size,size,size];
 
         for (int x = 0; x < size; x++)
         {
@@ -115,8 +135,9 @@ public class TerrainGenerator : MonoBehaviour
             {
                 for (int z = 0; z < size; z++)
                 {
-                    
-                    float point = Perlin3D(rngOffset + offsetX + x * noiseScale, rngOffset + offsetY + y * noiseScale, rngOffset + offsetZ + z * noiseScale);
+                    float point = Perlin3D(x, y, z, noiseOctaves-1, noisePersistence, noiseLacunarity);
+
+                    //gizmos[x, y, z] = point >= surfaceLevel ? point : -1;
 
                     if (point > max)
                     {
@@ -213,8 +234,39 @@ public class TerrainGenerator : MonoBehaviour
         meshFilter.mesh = mesh;
     }
 
+    private float Perlin3D(
+        float x, float y, float z,
+        int subsamples = 0,
+        float amplFalloff = 1f, float freqIncrease = 1f,
+        float startAmplitude = 1f, float startFrequency = 1f
+        )
+    {
+        Random.InitState(seed);
+        var rngState = Random.state;
 
-    private float Perlin3D(float x, float y, float z)
+        float pointValue = 0f;
+        float theoreticalMax = 0f;
+
+        for (int i = 0; i <= subsamples; i++)
+        {
+            float rngOffset = Random.Range(-100_000f, 100_000f);
+
+            pointValue += startAmplitude * Perlin3DNoise(
+                (x / noiseScale * startFrequency) + offsetX + rngOffset,
+                (y / noiseScale * startFrequency) + offsetX + rngOffset,
+                (z / noiseScale * startFrequency) + offsetX + rngOffset
+                );
+            theoreticalMax += startAmplitude;
+
+            startAmplitude *= amplFalloff;
+            startFrequency *= freqIncrease;
+        }
+
+        Random.state = rngState;
+        return pointValue / theoreticalMax;
+    }
+
+    private static float Perlin3DNoise(float x, float y, float z)
     {
         float ab = Mathf.PerlinNoise(x, y);
         float bc = Mathf.PerlinNoise(y, z);
