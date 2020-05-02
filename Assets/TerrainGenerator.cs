@@ -181,6 +181,14 @@ public class TerrainGenerator : MonoBehaviour
     private void MarchCube(int x, int y, int z)
     {
         // Get corners of cube.
+        /*
+                           5 ---- 6
+                          /|     /|
+        front top left-> 4-+----7 |
+                         | 1----|-2
+                         |/     |/
+                         O ---- 3
+         */
         int origin = points[x, y, z];
         int point1 = points[x, y, z + 1];
         int point2 = points[x + 1, y, z + 1];
@@ -194,34 +202,45 @@ public class TerrainGenerator : MonoBehaviour
 
         // Debug.Log(origin+ " point1 " + point1 + " point2 " + point2 + " point3 " + point3 + " point4 " + point4 + " point5 " + point5 + " point6 " + point6 + " point7 " + point7);
         // Calculate the index.
-        int triTableIndex = 0;
+        int cubeCfgIndex = 0;
         for (int i = 0; i < corners.Length; i++)
         {
             if (corners[i] == 1)
             {
-                triTableIndex |= 1 << i;
+                cubeCfgIndex |= 1 << i;
             }
         }
 
-        // Now generate the triangles.
+        // Now generate the triangles for this cube configuration
         Vector3 position = new Vector3(x, y, z);
 
-        // Go through all 16 indicies.
-        for (int i = 0; i < 16; i++)
+        // process all triangle vertices in pairs of 3
+        for (int triVertIdx = 0;;)
         {
-            int index = TriangularTable[triTableIndex, i];
-            // -1 means we are done with it.
-            if (index == -1)
+            int edge1Index = TriangularTable[cubeCfgIndex, triVertIdx++];
+            if (edge1Index == -1)
             {
+                // -1 means this configuration is complete
                 break;
             }
 
-            Vector3 vertexA = EdgeTable[index, 0];
-            Vector3 vertexB = EdgeTable[index, 1];
+            int edge2Index = TriangularTable[cubeCfgIndex, triVertIdx++];
+            int edge3Index = TriangularTable[cubeCfgIndex, triVertIdx++];
 
-            Vector3 vertexPosition = position + (vertexA + vertexB) / 2;
+            Vector3 vertex1 = position + InterpolateEdge(edge1Index);
+            Vector3 vertex2 = position + InterpolateEdge(edge2Index);
+            Vector3 vertex3 = position + InterpolateEdge(edge3Index);
 
-            vertices.Add(vertexPosition);
+            // add the triangle vertices into the table in reverse order
+            // because unity uses counter-clockwise vertex order, whereas
+            // the vertex table uses clockwise vertex order.
+            vertices.Add(vertex3);
+            triangles.Add(vertices.Count - 1);
+
+            vertices.Add(vertex2);
+            triangles.Add(vertices.Count - 1);
+
+            vertices.Add(vertex1);
             triangles.Add(vertices.Count - 1);
         }
     }
@@ -282,24 +301,40 @@ public class TerrainGenerator : MonoBehaviour
 
     Vector3[,] EdgeTable = new Vector3[12, 2] 
     {
+        /* index; referenced by the TriangleTable */                                    // cornerA -- cornerB
 
-        { new Vector3(0.0f, 0.0f, 0.0f), new Vector3(0.0f, 0.0f, 1.0f) },
-        { new Vector3(0.0f, 0.0f, 1.0f), new Vector3(1.0f, 0.0f, 1.0f) },
-        { new Vector3(1.0f, 0.0f, 1.0f), new Vector3(1.0f, 0.0f, 0.0f) },
-        { new Vector3(1.0f, 0.0f, 0.0f), new Vector3(0.0f, 0.0f, 0.0f) },
+        // bottom side of the cube
+        /*  0 */ { new Vector3(0f, 0f, 0f), new Vector3(0f, 0f, 1f) }, // O -- 1
+        /*  1 */ { new Vector3(0f, 0f, 1f), new Vector3(1f, 0f, 1f) }, // 1 -- 2
+        /*  2 */ { new Vector3(1f, 0f, 1f), new Vector3(1f, 0f, 0f) }, // 2 -- 3
+        /*  3 */ { new Vector3(1f, 0f, 0f), new Vector3(0f, 0f, 0f) }, // 3 -- O
 
-        { new Vector3(0.0f, 1.0f, 0.0f), new Vector3(0.0f, 1.0f, 1.0f) },
-        { new Vector3(0.0f, 1.0f, 1.0f), new Vector3(1.0f, 1.0f, 1.0f) },
-        { new Vector3(1.0f, 1.0f, 1.0f), new Vector3(1.0f, 1.0f, 0.0f) },
-        { new Vector3(1.0f, 1.0f, 0.0f), new Vector3(0.0f, 1.0f, 0.0f) },
+        // top side of the cube
+        /*  4 */ { new Vector3(0f, 1f, 0f), new Vector3(0f, 1f, 1f) }, // 4 -- 5
+        /*  5 */ { new Vector3(0f, 1f, 1f), new Vector3(1f, 1f, 1f) }, // 5 -- 6
+        /*  6 */ { new Vector3(1f, 1f, 1f), new Vector3(1f, 1f, 0f) }, // 6 -- 7
+        /*  7 */ { new Vector3(1f, 1f, 0f), new Vector3(0f, 1f, 0f) }, // 7 -- 4
 
-        { new Vector3(0.0f, 0.0f, 0.0f), new Vector3(0.0f, 1.0f, 0.0f) },
-        { new Vector3(0.0f, 0.0f, 1.0f), new Vector3(0.0f, 1.0f, 1.0f) },
-        { new Vector3(1.0f, 0.0f, 1.0f), new Vector3(1.0f, 1.0f, 1.0f) },
-        { new Vector3(1.0f, 0.0f, 0.0f), new Vector3(1.0f, 1.0f, 0.0f) }
-
+        // the vertical "pillars" connecting top and bottom
+        /*  8 */ { new Vector3(0f, 0f, 0f), new Vector3(0f, 1f, 0f) }, // O -- 4
+        /*  9 */ { new Vector3(0f, 0f, 1f), new Vector3(0f, 1f, 1f) }, // 1 -- 5
+        /* 10 */ { new Vector3(1f, 0f, 1f), new Vector3(1f, 1f, 1f) }, // 2 -- 6
+        /* 11 */ { new Vector3(1f, 0f, 0f), new Vector3(1f, 1f, 0f) }  // 3 -- 7
     };
 
+    private Vector3 InterpolateEdge(int edgeIndex, float t = 0.5f)
+    {
+        // triangle vertices lay on the cube-edges between adjacent corners of the cube
+        return Vector3.Lerp(EdgeTable[edgeIndex, 0], EdgeTable[edgeIndex, 1], t);
+    }
+
+    /*
+     * This table references the indices in the above EdgeTable
+     * A value of -1 causes the algorithm to terminate (hence
+     * the last number is always -1).
+     * Consecutive indices in pairs of 3 make up the vertices of 1 triangle,
+     * with the front-face facing into the cube (if using CCW vertex order, like unity does).
+     */
     int[,] TriangularTable = new int[256, 16]
     {{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
 {0, 8, 3, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
