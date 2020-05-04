@@ -152,12 +152,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2335202103983304c830daa2d1d175dd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  size: 50
+  size: 30
   offsetX: 0
   offsetY: 0
   offsetZ: 0
-  noiseScale: 0.05
-  surfaceLevel: 0.55
+  noiseScale: 9
+  noiseOctaves: 2
+  noisePersistence: 0.43
+  noiseLacunarity: 2.98
+  surfaceLevel: 0.564
   seed: 30
   debugMode: 0
   autoUpdate: 1
