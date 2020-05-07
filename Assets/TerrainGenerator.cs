@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
-[RequireComponent(typeof(MeshFilter))]
 public class TerrainGenerator : MonoBehaviour
 {
     public int size = 50;
@@ -27,31 +26,35 @@ public class TerrainGenerator : MonoBehaviour
     public bool debugMode = false;
 
     public bool autoUpdate = true;
+    
+    public GameObject cubeFabe;
 
     private int[,,] points;
+    private float[,,] gizmos;
+
     private List<Vector3> vertices;
     private List<int> triangles = new List<int>();
-    private MeshFilter meshFilter;
-    private Mesh mesh;
 
-    private List<List<int>> trianglesList;
+    private List<Vector3[]> verticesArrayList;
+    private List<int[]> trianglesArrayList;
 
     // DEBUG:
     private int x = 0;
 
     public void Generate()
     {
-        if (meshFilter.mesh != null)
-        {
-            meshFilter.mesh.Clear();
-        }
-
-        mesh = new Mesh();
-
         Debug.Log("RESTART: ");
         points = new int[size, size, size];
         vertices = new List<Vector3>();
         triangles = new List<int>();
+        verticesArrayList = new List<Vector3[]>();
+        trianglesArrayList = new List<int[]>();
+
+        // Remove children.
+        foreach (Transform child in transform)
+        {
+            Destroy(child.gameObject);
+        }
 
         // DEBUG:
         x = 0;
@@ -70,8 +73,6 @@ public class TerrainGenerator : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        meshFilter = GetComponent<MeshFilter>();
-
         Generate();
     }
 
@@ -105,7 +106,6 @@ public class TerrainGenerator : MonoBehaviour
         }
     }
 
-    private float[,,] gizmos;
     private void OnDrawGizmos()
     {
         if (gizmos is null)
@@ -130,9 +130,7 @@ public class TerrainGenerator : MonoBehaviour
         //gizmos = new float[size,size,size];
 
         for (int x = 0; x < size; x++)
-        {
             for (int y = 0; y < size; y++)
-            {
                 for (int z = 0; z < size; z++)
                 {
                     float point = Perlin3D(x, y, z, noiseOctaves-1, noisePersistence, noiseLacunarity);
@@ -158,23 +156,35 @@ public class TerrainGenerator : MonoBehaviour
                         points[x, y, z] = 0; // Outside
                     }
                 }
-            }
-        }
-        Debug.Log("Min: " + min);
-        Debug.Log("Max: " + max);
     }
 
     private void CreateMeshTriangles()
     {
         for (int x = 0; x < size - 1; x++)
-        {
+        { 
             for (int y = 0; y < size - 1; y++)
-            {
+            { 
                 for (int z = 0; z < size - 1; z++)
                 {
                     MarchCube(x, y, z);
+
+                    // Make sure the meshes size does not excced the maximum size.
+                    if (vertices.Count > 65_000)
+                    {
+                        verticesArrayList.Add(vertices.ToArray());
+                        trianglesArrayList.Add(triangles.ToArray());
+
+                        vertices = new List<Vector3>();
+                        triangles = new List<int>();
+                    }
                 }
             }
+        }
+
+        if (vertices.Count > 0)
+        {
+            verticesArrayList.Add(vertices.ToArray());
+            trianglesArrayList.Add(triangles.ToArray());
         }
     }
 
@@ -247,10 +257,19 @@ public class TerrainGenerator : MonoBehaviour
 
     private void RenderMesh()
     {
-        mesh.vertices = vertices.ToArray();
-        mesh.triangles = triangles.ToArray();
-        mesh.RecalculateNormals();
-        meshFilter.mesh = mesh;
+        for (int i = 0; i < verticesArrayList.Count; i++)
+        {
+            Mesh mesh = new Mesh();
+            mesh.vertices = verticesArrayList[i];
+            mesh.triangles = trianglesArrayList[i];
+            mesh.RecalculateNormals();
+
+            GameObject g = Instantiate(cubeFabe, new Vector3(0, 0, 0), Quaternion.identity, gameObject.transform);
+            g.GetComponent<MeshFilter>().mesh = mesh;
+
+            vertices = new List<Vector3>();
+            triangles = new List<int>();
+        }
     }
 
     private float Perlin3D(
@@ -271,9 +290,9 @@ public class TerrainGenerator : MonoBehaviour
             float rngOffset = Random.Range(-100_000f, 100_000f);
 
             pointValue += startAmplitude * Perlin3DNoise(
-                (x / noiseScale * startFrequency) + offsetX + rngOffset,
-                (y / noiseScale * startFrequency) + offsetX + rngOffset,
-                (z / noiseScale * startFrequency) + offsetX + rngOffset
+                (x / noiseScale * startFrequency) + rngOffset + offsetX,
+                (y / noiseScale * startFrequency) + rngOffset + offsetY,
+                (z / noiseScale * startFrequency) + rngOffset + offsetZ
                 );
             theoreticalMax += startAmplitude;
 
