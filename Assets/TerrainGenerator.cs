@@ -27,7 +27,7 @@ public class TerrainGenerator : MonoBehaviour
 
     public bool autoUpdate = true;
     
-    public GameObject cubeFabe;
+    public Material terrainMaterial;
 
     private int[,,] points;
     private float[,,] gizmos;
@@ -168,7 +168,7 @@ public class TerrainGenerator : MonoBehaviour
                 {
                     MarchCube(x, y, z);
 
-                    // Make sure the meshes size does not excced the maximum size.
+                    // Make sure the meshes size does not exceed the maximum size.
                     if (vertices.Count > 65_000)
                     {
                         verticesArrayList.Add(vertices.ToArray());
@@ -259,13 +259,18 @@ public class TerrainGenerator : MonoBehaviour
     {
         for (int i = 0; i < verticesArrayList.Count; i++)
         {
+            // create mesh
             Mesh mesh = new Mesh();
             mesh.vertices = verticesArrayList[i];
             mesh.triangles = trianglesArrayList[i];
             mesh.RecalculateNormals();
 
-            GameObject g = Instantiate(cubeFabe, new Vector3(0, 0, 0), Quaternion.identity, gameObject.transform);
-            g.GetComponent<MeshFilter>().mesh = mesh;
+            // create container GameObject for the mesh
+            GameObject g = new GameObject("MeshContainer" + i);
+            g.transform.parent = transform;
+            g.transform.position = transform.position;
+            g.AddComponent<MeshFilter>().mesh = mesh;
+            g.AddComponent<MeshRenderer>().material = terrainMaterial;
 
             vertices = new List<Vector3>();
             triangles = new List<int>();
@@ -290,9 +295,9 @@ public class TerrainGenerator : MonoBehaviour
             float rngOffset = Random.Range(-100_000f, 100_000f);
 
             pointValue += startAmplitude * Perlin3DNoise(
-                (x / noiseScale * startFrequency) + rngOffset + offsetX,
-                (y / noiseScale * startFrequency) + rngOffset + offsetY,
-                (z / noiseScale * startFrequency) + rngOffset + offsetZ
+                ((x+offsetX) / noiseScale * startFrequency) + rngOffset,
+                ((y+offsetY) / noiseScale * startFrequency) + rngOffset,
+                ((z+offsetZ) / noiseScale * startFrequency) + rngOffset
                 );
             theoreticalMax += startAmplitude;
 
